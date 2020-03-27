@@ -454,7 +454,10 @@ class TransformerBach(nn.Module):
                  top_p=1,
                  batch_size=1,
                  melody_constraint=None,
-                 hard_constraint=False):
+                 hard_constraint=False,
+                 show_debug_symbols=False,
+                 exclude_non_note_symbols=True
+                 ):
         self.eval()
         if melody_constraint is not None:
             num_events = len(melody_constraint)
@@ -472,12 +475,12 @@ class TransformerBach(nn.Module):
             x = x.repeat(batch_size, 1, 1)
             masked_positions = masked_positions.repeat(batch_size, 1, 1)
 
-            for event_index in range(num_events):
+            for event_index in range(num_start_index, num_events + num_start_index):
                 for channel_index in range(self.num_channels):
                     # slice x
                     t_begin, t_end, t_relative = self.compute_start_end_times(
                         event_index // self.num_events_grouped,
-                        num_blocks=num_events // self.num_events_grouped,
+                        num_blocks=(num_events + 2 * num_start_index) // self.num_events_grouped,
                         num_blocks_model=self.num_tokens_target // (self.num_events_grouped
                                                                     * self.num_channels)
                     )
@@ -510,6 +513,15 @@ class TransformerBach(nn.Module):
                             self.num_tokens_per_channel[channel_index]
                         ), p=p[batch_index])
 
+                        # exclude non note symbols:
+                        if exclude_non_note_symbols:
+                            exclude_symbols = [PAD_SYMBOL, END_SYMBOL, START_SYMBOL]
+                            for sym in exclude_symbols:
+                                sym_index = self.dataloader_generator.dataset.note2index_dicts[
+                                    channel_index][sym]
+                                p[:, sym_index] = 0
+                            p = p / p.sum(axis=1, keepdims=True)
+
                         # only if not constrained
                         if not (hard_constraint
                                 and
@@ -519,6 +531,8 @@ class TransformerBach(nn.Module):
                               event_index,
                               channel_index] = int(new_pitch_index)
 
+        if not show_debug_symbols:
+            x = x[:, num_start_index : -num_start_index]
         # to score
         tensor_score = self.data_processor.postprocess(
             x.cpu().split(1, 0))

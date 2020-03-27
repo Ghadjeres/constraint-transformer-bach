@@ -103,14 +103,18 @@ def main(train,
             num_workers=num_workers
         )
 
-    # melody_constraint = TETRIS_MELODY
-    melody_constraint = LONG_TETRIS_MELODY
+    melody_constraint = TETRIS_MELODY
+    # melody_constraint = LONG_TETRIS_MELODY
     # melody_constraint = None
     scores = transformer.generate(temperature=0.9,
-                                  top_p=0.8,
+                                  top_p=0.7,
                                   batch_size=3,
                                   melody_constraint=melody_constraint,
-                                  hard_constraint=True)
+                                  hard_constraint=True,
+                                  show_debug_symbols=False,
+                                  exclude_non_note_symbols=True
+                                  )
+
 
 if __name__ == '__main__':
     main()
